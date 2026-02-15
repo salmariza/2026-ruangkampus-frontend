@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RoomListPage from './pages/RoomListPage';  
 import BookingForm from './pages/BookingForm'; 
+import AddRoomPage from "./pages/AddRoomPage";
 
 const App: React.FC = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -17,6 +18,7 @@ const App: React.FC = () => {
         <Route path="/rooms" element={<RoomListPage />} />
         <Route path="/rooms" element={<RoomListPage />} />
         <Route path="/booking" element={<BookingForm />} />
+        <Route path="/add-room" element={<AddRoomPage />} />
       </Routes>
     </Router>
   );
