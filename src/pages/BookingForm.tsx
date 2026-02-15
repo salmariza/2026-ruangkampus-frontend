@@ -1,77 +1,108 @@
-import React, { useState } from 'react';
-import api from '../services/api'; 
+// src/pages/BookingForm.tsx
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
 
 const BookingForm: React.FC = () => {
-const [roomId, setRoomId] = useState<number | string>('');
-const [bookerName, setBookerName] = useState('');
-const [startTime, setStartTime] = useState('');
-const [endTime, setEndTime] = useState('');
-const [status, setStatus] = useState('Pending');
-const [message, setMessage] = useState('');
+  const [rooms, setRooms] = useState<any[]>([]); // Menyimpan daftar ruangan
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(''); // Menyimpan ID ruangan yang dipilih
+  const [name, setName] = useState<string>(''); // Nama pemesan
+  const [startDate, setStartDate] = useState<string>(''); // Tanggal mulai
+  const [endDate, setEndDate] = useState<string>(''); // Tanggal selesai
 
-    const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const bookingData = { roomId, bookerName, startTime, endTime, status };
+  useEffect(() => {
+    // Ambil data ruangan dari API
+    api.get('/rooms')
+      .then((response) => {
+        setRooms(response.data); // Menyimpan data ruangan
+      })
+      .catch((error) => {
+        console.error('Error fetching rooms:', error);
+      });
+  }, []);
 
-    try {
-        await api.post('/roombookings', bookingData); 
-        setMessage('Booking berhasil dilakukan!');
-    } catch (error) {
-        setMessage('Gagal melakukan booking. Coba lagi.');
-    }
+  const handleRoomChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedRoomId(event.target.value); // Set ID ruangan berdasarkan pilihan
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    // Kirim data ke backend sesuai dengan ID ruangan yang dipilih
+    const bookingData = {
+      roomId: selectedRoomId, // ID ruangan
+      name,
+      startDate,
+      endDate,
     };
 
-    return (
+    // Kirim ke API untuk peminjaman
+    api.post('/roomBookings', bookingData)
+      .then((response) => {
+        console.log('Booking successful:', response.data);
+      })
+      .catch((error) => {
+        console.error('Booking failed:', error);
+      });
+  };
+
+  return (
     <div>
-    <h1>Form Peminjaman Ruangan</h1>
-        <form onSubmit={handleSubmit}>
+      <h1>Form Peminjaman Ruangan</h1>
+      <form onSubmit={handleSubmit}>
         <div>
-            <label htmlFor="roomId">Ruangan:</label>
-            <input
-            type="number"
-            id="roomId"
-            value={roomId}
-            onChange={(e) => setRoomId(Number(e.target.value))}
-            required
-        />
-        </div>
-        <div>
-            <label htmlFor="bookerName">Nama Pemesan:</label>
-            <input
+          <label htmlFor="name">Nama Pemesan:</label>
+          <input
             type="text"
-            id="bookerName"
-            value={bookerName}
-            onChange={(e) => setBookerName(e.target.value)}
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Masukkan Nama Pemesan"
             required
           />
         </div>
+
         <div>
-          <label htmlFor="startTime">Waktu Mulai:</label>
+          <label htmlFor="startDate">Waktu Mulai:</label>
           <input
-            type="datetime-local"
-            id="startTime"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
+            type="date"
+            id="startDate"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
             required
-        />
+          />
         </div>
+
         <div>
-            <label htmlFor="endTime">Waktu Selesai:</label>
-                <input
-                type="datetime-local"
-                id="endTime"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                required
-            />
+          <label htmlFor="endDate">Waktu Selesai:</label>
+          <input
+            type="date"
+            id="endDate"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            required
+          />
         </div>
+
         <div>
-            <button type="submit">Booking</button>
+          <label htmlFor="room">Pilih Ruangan:</label>
+          <select
+            id="room"
+            value={selectedRoomId}
+            onChange={handleRoomChange}
+            required
+          >
+            <option value="">Pilih Ruangan</option>
+            {rooms.map((room) => (
+              <option key={room.id} value={room.id}>
+                {room.name} {/* Tampilkan nama ruangan di dropdown */}
+              </option>
+            ))}
+          </select>
         </div>
-    </form>
-    {message && <p>{message}</p>}
+
+        <button type="submit">Booking</button>
+      </form>
     </div>
-);
+  );
 };
 
 export default BookingForm;
