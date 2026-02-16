@@ -9,13 +9,18 @@ type RoomBooking = {
   purposeOfBooking: string;
   startTime: string;
   endTime: string;
-  status: "Pending" | "Approved" | "Rejected" | string;
+  status: string; // bisa "Pending"/"pending"/0 dll, kita amankan
 };
 
 const formatDT = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+};
+
+const toStatusText = (status: any) => {
+  // normalize status jadi teks kecil tanpa spasi
+  return String(status ?? "").trim().toLowerCase();
 };
 
 const RoomBookingsPage: React.FC = () => {
@@ -52,19 +57,15 @@ const RoomBookingsPage: React.FC = () => {
     }
   };
 
-  const handleChangeStatus = async (id: number, nextStatus: 0 | 1 | 2) => {
+  const handleChangeStatus = async (id: number, nextStatus: 1 | 2) => {
     try {
       setUpdatingId(id);
+      // 1 = Approved, 2 = Rejected (sesuai enum kamu)
       await updateBookingStatus(id, nextStatus);
-      await fetchBookings(); // refresh biar status langsung berubah di tabel
+      await fetchBookings();
     } catch (e: any) {
       console.error(e);
-
-      // kalau backend ngirim message (BadRequest), coba tampilkan
-      const msg =
-        e?.response?.data ||
-        e?.message ||
-        "Gagal update status";
+      const msg = e?.response?.data || e?.message || "Gagal update status";
       alert(typeof msg === "string" ? msg : "Gagal update status");
     } finally {
       setUpdatingId(null);
@@ -89,8 +90,6 @@ const RoomBookingsPage: React.FC = () => {
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>RoomId</th>
               <th>Nama Peminjam</th>
               <th>Tujuan</th>
               <th>Mulai</th>
@@ -102,25 +101,24 @@ const RoomBookingsPage: React.FC = () => {
 
           <tbody>
             {bookings.map((b) => {
+              const statusText = toStatusText(b.status);
+              const isPending = statusText === "pending" || statusText === "0"; // jaga-jaga kalau backend ngirim 0
               const isUpdating = updatingId === b.id;
 
               return (
                 <tr key={b.id}>
-                  <td>{b.id}</td>
-                  <td>{b.roomId}</td>
                   <td>{b.bookerName}</td>
                   <td>{b.purposeOfBooking}</td>
                   <td>{formatDT(b.startTime)}</td>
                   <td>{formatDT(b.endTime)}</td>
 
-                  {/* Status + tombol approve/reject */}
                   <td>
                     <span style={{ marginRight: 8 }}>{b.status}</span>
 
-                    {b.status === "Pending" && (
+                    {isPending && (
                       <>
                         <button
-                          onClick={() => handleChangeStatus(b.id, 1)} // Approved
+                          onClick={() => handleChangeStatus(b.id, 1)}
                           disabled={isUpdating}
                           style={{ marginRight: 6 }}
                         >
@@ -128,7 +126,7 @@ const RoomBookingsPage: React.FC = () => {
                         </button>
 
                         <button
-                          onClick={() => handleChangeStatus(b.id, 2)} // Rejected
+                          onClick={() => handleChangeStatus(b.id, 2)}
                           disabled={isUpdating}
                         >
                           {isUpdating ? "..." : "Reject"}
@@ -137,7 +135,6 @@ const RoomBookingsPage: React.FC = () => {
                     )}
                   </td>
 
-                  {/* Aksi lainnya */}
                   <td style={{ display: "flex", gap: 8 }}>
                     <Link to={`/edit-booking/${b.id}`}>
                       <button>Edit</button>
