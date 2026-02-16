@@ -73,7 +73,7 @@ const EditRoomPage: React.FC = () => {
       navigate("/rooms");
     } catch (err) {
       console.error(err);
-      setError("Gagal update ruangan. Cek backend / payload ya.");
+      setError("Gagal update ruangan.");
     } finally {
       setSaving(false);
     }

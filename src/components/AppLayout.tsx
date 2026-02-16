@@ -49,7 +49,6 @@ const AppLayout: React.FC<React.PropsWithChildren> = ({ children }) => {
         </Toolbar>
     </AppBar>
 
-      {/* Spacer biar konten gak ketiban header fixed */}
     <Box sx={{ height: HEADER_H }} />
 
     <Container maxWidth="lg" sx={{ py: 4 }}>

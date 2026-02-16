@@ -40,7 +40,6 @@ const AddBookingPage: React.FC = () => {
     const fetchRooms = async () => {
       try {
         const res = await api.get("/Rooms");
-        // optional: hanya room aktif
         const activeRooms = (res.data as Room[]).filter((r) => r.isActive);
         setRooms(activeRooms);
       } catch (e) {
@@ -58,7 +57,7 @@ const AddBookingPage: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    // validasi simpel
+    // validasi
     if (!roomId) return setError("Pilih ruangan dulu.");
     if (!bookerName.trim()) return setError("Nama peminjam wajib diisi.");
     if (!purposeOfBooking.trim())
@@ -73,14 +72,12 @@ const AddBookingPage: React.FC = () => {
       return setError("StartTime harus lebih kecil dari EndTime.");
     }
 
-    // ambil roomName (backend minta RoomName required)
     const selectedRoom = rooms.find((r) => r.id === Number(roomId));
     if (!selectedRoom) return setError("Ruangan tidak ditemukan.");
 
     try {
       setSaving(true);
 
-      // IMPORTANT: ikut Swagger / backend validation => PascalCase
       const payload = {
         RoomId: Number(roomId),
         RoomName: selectedRoom.name,
@@ -97,14 +94,12 @@ const AddBookingPage: React.FC = () => {
     } catch (e: any) {
       console.error(e);
 
-      // tampilkan error backend dengan rapi
       const data = e?.response?.data;
       let msg = "Gagal membuat booking.";
 
       if (typeof data === "string") {
         msg = data;
       } else if (data?.errors) {
-        // ASP.NET validation format: { errors: { Field: ["msg"] } }
         const firstField = Object.keys(data.errors)[0];
         const firstMsg = data.errors?.[firstField]?.[0];
         msg = firstMsg || data.title || msg;

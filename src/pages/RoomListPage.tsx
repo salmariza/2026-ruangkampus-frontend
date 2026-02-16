@@ -261,7 +261,6 @@ const RoomListPage: React.FC = () => {
         <Alert severity="info">Belum ada ruangan yang tersedia.</Alert>
       )}
 
-      {/* Link bawah (sebenarnya udah ada menu di header, tapi ini gue biarin biar fungsinya gak hilang) */}
       <Box sx={{ mt: 3 }}>
         <Button
           component={RouterLink}

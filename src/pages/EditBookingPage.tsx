@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { getRooms, getRoomBookingById, updateRoomBooking, BookingStatusText } from "../services/api";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import api from "../services/api";
+import { getRooms, getRoomBookingById, BookingStatusText } from "../services/api";
+
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Divider,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 type Room = {
   id: number;
@@ -11,24 +25,16 @@ type Room = {
 };
 
 const toInputValue = (iso: string) => {
-  // ISO -> "YYYY-MM-DDTHH:mm" (buat input type=datetime-local)
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const min = pad(d.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
 };
 
 const toIsoFromInput = (value: string) => {
-  // "YYYY-MM-DDTHH:mm" -> ISO
-  // new Date(value) akan treat sebagai local time lalu jadi ISO UTC.
-  // Ini udah cukup buat tugas kamu.
-  const d = new Date(value);
-  return d.toISOString();
+  return new Date(value).toISOString();
 };
 
 const EditBookingPage: React.FC = () => {
@@ -46,8 +52,8 @@ const EditBookingPage: React.FC = () => {
   const [roomId, setRoomId] = useState<number>(0);
   const [bookerName, setBookerName] = useState("");
   const [purposeOfBooking, setPurposeOfBooking] = useState("");
-  const [startTime, setStartTime] = useState(""); // datetime-local value
-  const [endTime, setEndTime] = useState("");     // datetime-local value
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [status, setStatus] = useState<BookingStatusText>("Pending");
 
   const activeRooms = useMemo(() => rooms.filter((r) => r.isActive), [rooms]);
@@ -76,7 +82,6 @@ const EditBookingPage: React.FC = () => {
         setStartTime(toInputValue(booking.startTime));
         setEndTime(toInputValue(booking.endTime));
 
-        // status dari backend biasanya string: "Pending"/"Approved"/"Rejected"
         const s = (booking.status ?? "Pending") as BookingStatusText;
         setStatus(s);
       } catch (e: any) {
@@ -93,10 +98,14 @@ const EditBookingPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setError(null);
+
     if (!roomId) return setError("Pilih ruangan dulu.");
     if (!bookerName.trim()) return setError("Nama peminjam wajib diisi.");
-    if (!purposeOfBooking.trim()) return setError("Tujuan peminjaman wajib diisi.");
-    if (!startTime || !endTime) return setError("Waktu mulai & selesai wajib diisi.");
+    if (!purposeOfBooking.trim())
+      return setError("Tujuan peminjaman wajib diisi.");
+    if (!startTime || !endTime)
+      return setError("Waktu mulai & selesai wajib diisi.");
 
     const startIso = toIsoFromInput(startTime);
     const endIso = toIsoFromInput(endTime);
@@ -105,96 +114,184 @@ const EditBookingPage: React.FC = () => {
       return setError("Waktu selesai harus lebih besar dari waktu mulai.");
     }
 
+    const selectedRoom = rooms.find((r) => r.id === roomId);
+    if (!selectedRoom) return setError("Ruangan tidak ditemukan.");
+
     try {
       setSaving(true);
-      setError(null);
 
-      await updateRoomBooking(bookingId, {
-        roomId,
-        bookerName: bookerName.trim(),
-        purposeOfBooking: purposeOfBooking.trim(),
-        startTime: startIso,
-        endTime: endIso,
-        status,
-      });
+      const payload = {
+        RoomId: roomId,
+        RoomName: selectedRoom.name,
+        BookerName: bookerName.trim(),
+        PurposeOfBooking: purposeOfBooking.trim(),
+        StartTime: startIso,
+        EndTime: endIso,
+        Status: status, // "Pending" | "Approved" | "Rejected"
+      };
+
+      await api.patch(`/RoomBookings/${bookingId}`, payload);
 
       nav("/room-bookings");
     } catch (e: any) {
       console.error(e);
-      const msg =
-        e?.response?.data ||
-        e?.message ||
-        "Gagal menyimpan perubahan booking.";
-      setError(typeof msg === "string" ? msg : "Gagal menyimpan perubahan booking.");
+
+      const data = e?.response?.data;
+      let msg = "Gagal menyimpan perubahan booking.";
+
+      if (typeof data === "string") {
+        msg = data;
+      } else if (data?.errors) {
+        const firstField = Object.keys(data.errors)[0];
+        const firstMsg = data.errors?.[firstField]?.[0];
+        msg = firstMsg || data.title || msg;
+      } else if (data?.title || data?.message) {
+        msg = data.title || data.message;
+      }
+
+      setError(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p style={{ color: "crimson" }}>{error}</p>;
+  if (loading) {
+    return (
+      <Paper sx={{ p: 4 }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <CircularProgress size={22} />
+          <Typography>Loading booking...</Typography>
+        </Stack>
+      </Paper>
+    );
+  }
 
   return (
-    <div>
-      <h1>Edit Booking</h1>
+    <Paper sx={{ p: { xs: 2.5, sm: 3.5 }, maxWidth: 760, mx: "auto" }}>
+      {/* Header*/}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+            Edit Booking Ruangan
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Perbarui informasi peminjaman ruangan.
+          </Typography>
+        </Box>
 
-      <div style={{ marginBottom: 12 }}>
-        <Link to="/room-bookings">← Kembali</Link>
-      </div>
+        <Button
+          component={RouterLink}
+          to="/room-bookings"
+          variant="outlined"
+          color="primary"
+          disabled={saving}
+        >
+          ← Kembali
+        </Button>
+      </Stack>
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-        <div>
-          <label>Pilih Ruangan</label>
-          <br />
-          <select value={roomId} onChange={(e) => setRoomId(Number(e.target.value))}>
-            <option value={0}>-- Pilih Ruangan --</option>
+      <Divider sx={{ mb: 2.5 }} />
+
+      <Box component="form" onSubmit={handleSubmit}>
+        <Stack spacing={2.2}>
+          <TextField
+            select
+            label="Pilih Ruangan"
+            value={roomId}
+            onChange={(e) => setRoomId(Number(e.target.value))}
+            fullWidth
+            required
+          >
+            <MenuItem value={0}>-- Pilih Ruangan --</MenuItem>
             {activeRooms.map((r) => (
-              <option key={r.id} value={r.id}>
+              <MenuItem key={r.id} value={r.id}>
                 {r.name}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </div>
+          </TextField>
 
-        <div>
-          <label>Nama Peminjam</label>
-          <br />
-          <input value={bookerName} onChange={(e) => setBookerName(e.target.value)} />
-        </div>
+          <TextField
+            label="Nama Peminjam"
+            value={bookerName}
+            onChange={(e) => setBookerName(e.target.value)}
+            fullWidth
+            required
+          />
 
-        <div>
-          <label>Tujuan Peminjaman</label>
-          <br />
-          <input value={purposeOfBooking} onChange={(e) => setPurposeOfBooking(e.target.value)} />
-        </div>
+          <TextField
+            label="Tujuan Peminjaman"
+            value={purposeOfBooking}
+            onChange={(e) => setPurposeOfBooking(e.target.value)}
+            fullWidth
+            required
+          />
 
-        <div>
-          <label>Waktu Mulai</label>
-          <br />
-          <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-        </div>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="Waktu Mulai"
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              required
+            />
 
-        <div>
-          <label>Waktu Selesai</label>
-          <br />
-          <input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-        </div>
+            <TextField
+              label="Waktu Selesai"
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              required
+            />
+          </Stack>
 
-        <div>
-          <label>Status</label>
-          <br />
-          <select value={status} onChange={(e) => setStatus(e.target.value as BookingStatusText)}>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-        </div>
+          <TextField
+            select
+            label="Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as BookingStatusText)}
+            fullWidth
+            required
+          >
+            <MenuItem value="Pending">Pending</MenuItem>
+            <MenuItem value="Approved">Approved</MenuItem>
+            <MenuItem value="Rejected">Rejected</MenuItem>
+          </TextField>
 
-        <button type="submit" disabled={saving}>
-          {saving ? "Menyimpan..." : "Simpan Perubahan"}
-        </button>
-      </form>
-    </div>
+          {error && <Alert severity="error">{error}</Alert>}
+
+          <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+            <Button
+              component={RouterLink}
+              to="/room-bookings"
+              variant="outlined"
+              color="primary"
+              disabled={saving}
+            >
+              Batal
+            </Button>
+
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={saving}
+            >
+              {saving ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </Stack>
+        </Stack>
+      </Box>
+    </Paper>
   );
 };
 

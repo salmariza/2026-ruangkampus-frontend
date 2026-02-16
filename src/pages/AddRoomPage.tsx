@@ -47,7 +47,7 @@ const AddRoomPage: React.FC = () => {
       navigate("/rooms");
     } catch (err: any) {
       console.error(err);
-      setError("Gagal menambahkan ruangan. Cek backend / payload ya.");
+      setError("Gagal menambahkan ruangan.");
     } finally {
       setLoading(false);
     }
