@@ -1,5 +1,11 @@
-// src/components/RoomBookingsFilter.tsx
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  Box,
+  TextField,
+  MenuItem,
+  Button,
+  Stack,
+} from "@mui/material";
 
 type Room = {
   id: number;
@@ -7,8 +13,12 @@ type Room = {
 };
 
 type Props = {
-  rooms: Room[]; // daftar room buat dropdown (id + name)
-  onFilter: (filters: { keyword: string; isActive: "" | "true" | "false"; roomId: "" | string }) => void;
+  rooms: Room[];
+  onFilter: (filters: {
+    keyword: string;
+    isActive: "" | "true" | "false";
+    roomId: "" | string;
+  }) => void;
 };
 
 const RoomBookingsFilter: React.FC<Props> = ({ rooms, onFilter }) => {
@@ -16,7 +26,6 @@ const RoomBookingsFilter: React.FC<Props> = ({ rooms, onFilter }) => {
   const [isActive, setIsActive] = useState<"" | "true" | "false">("");
   const [roomId, setRoomId] = useState<"" | string>("");
 
-  // biar gak spam onFilter tiap ketik 1 huruf (optional tapi enak)
   useEffect(() => {
     const t = setTimeout(() => {
       onFilter({ keyword, isActive, roomId });
@@ -28,43 +37,64 @@ const RoomBookingsFilter: React.FC<Props> = ({ rooms, onFilter }) => {
   const roomOptions = useMemo(() => rooms ?? [], [rooms]);
 
   return (
-    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "12px 0" }}>
-      <input
-        type="text"
-        placeholder="Cari nama ruangan / lokasi..."
-        value={keyword}
-        onChange={(e) => setKeyword(e.target.value)}
-        style={{ padding: 8, minWidth: 240 }}
-      />
-
-      <select value={isActive} onChange={(e) => setIsActive(e.target.value as any)} style={{ padding: 8 }}>
-        <option value="">Semua Status</option>
-        <option value="true">Aktif</option>
-        <option value="false">Tidak Aktif</option>
-      </select>
-
-      <select value={roomId} onChange={(e) => setRoomId(e.target.value)} style={{ padding: 8 }}>
-        <option value="">Semua Ruangan</option>
-        {roomOptions.map((r) => (
-          <option key={r.id} value={String(r.id)}>
-            {r.name}
-          </option>
-        ))}
-      </select>
-
-      <button
-        type="button"
-        onClick={() => {
-          setKeyword("");
-          setIsActive("");
-          setRoomId("");
-          onFilter({ keyword: "", isActive: "", roomId: "" });
-        }}
-        style={{ padding: "8px 12px" }}
+    <Box sx={{ mb: 1 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        alignItems={{ xs: "stretch", md: "center" }}
       >
-        Reset
-      </button>
-    </div>
+        <TextField
+          label="Cari Ruangan / Lokasi"
+          variant="outlined"
+          size="small"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          sx={{ minWidth: 240 }}
+        />
+
+        <TextField
+          select
+          label="Status"
+          size="small"
+          value={isActive}
+          onChange={(e) => setIsActive(e.target.value as any)}
+          sx={{ minWidth: 160 }}
+        >
+          <MenuItem value="">Semua Status</MenuItem>
+          <MenuItem value="true">Aktif</MenuItem>
+          <MenuItem value="false">Tidak Aktif</MenuItem>
+        </TextField>
+
+        <TextField
+          select
+          label="Ruangan"
+          size="small"
+          value={roomId}
+          onChange={(e) => setRoomId(e.target.value)}
+          sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="">Semua Ruangan</MenuItem>
+          {roomOptions.map((r) => (
+            <MenuItem key={r.id} value={String(r.id)}>
+              {r.name}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={() => {
+            setKeyword("");
+            setIsActive("");
+            setRoomId("");
+            onFilter({ keyword: "", isActive: "", roomId: "" });
+          }}
+        >
+          Reset
+        </Button>
+      </Stack>
+    </Box>
   );
 };
 

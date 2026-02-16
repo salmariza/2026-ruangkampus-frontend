@@ -1,6 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import api, { updateBookingStatus } from "../services/api";
+
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+} from "@mui/material";
 
 type RoomBooking = {
   id: number;
@@ -9,18 +27,79 @@ type RoomBooking = {
   purposeOfBooking: string;
   startTime: string;
   endTime: string;
-  status: string; // bisa "Pending"/"pending"/0 dll, kita amankan
+  status: string;
 };
 
 const formatDT = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 };
 
-const toStatusText = (status: any) => {
-  // normalize status jadi teks kecil tanpa spasi
-  return String(status ?? "").trim().toLowerCase();
+const toStatusText = (status: any) => String(status ?? "").trim().toLowerCase();
+
+const StatusChip: React.FC<{ status: string }> = ({ status }) => {
+  const s = toStatusText(status);
+
+  // Support enum-like "0/1/2" OR text "pending/approved/rejected"
+  const isPending = s === "pending" || s === "0";
+  const isApproved = s === "approved" || s === "approve" || s === "1";
+  const isRejected = s === "rejected" || s === "reject" || s === "2";
+
+  if (isPending) {
+    return (
+      <Chip
+        label="Pending"
+        size="small"
+        sx={{
+          bgcolor: "#FDE68A",
+          color: "#78350F",
+          fontWeight: 800,
+        }}
+      />
+    );
+  }
+
+  if (isApproved) {
+    return (
+      <Chip
+        label="Approved"
+        size="small"
+        sx={{
+          bgcolor: "#D1FAE5",
+          color: "#065F46",
+          fontWeight: 800,
+        }}
+      />
+    );
+  }
+
+  if (isRejected) {
+    return (
+      <Chip
+        label="Rejected"
+        size="small"
+        sx={{
+          bgcolor: "#FECACA",
+          color: "#7F1D1D",
+          fontWeight: 800,
+        }}
+      />
+    );
+  }
+
+  // fallback: show raw status but still styled
+  return (
+    <Chip
+      label={status}
+      size="small"
+      variant="outlined"
+      sx={{ fontWeight: 700 }}
+    />
+  );
 };
 
 const RoomBookingsPage: React.FC = () => {
@@ -44,6 +123,7 @@ const RoomBookingsPage: React.FC = () => {
 
   useEffect(() => {
     fetchBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDelete = async (id: number) => {
@@ -60,8 +140,7 @@ const RoomBookingsPage: React.FC = () => {
   const handleChangeStatus = async (id: number, nextStatus: 1 | 2) => {
     try {
       setUpdatingId(id);
-      // 1 = Approved, 2 = Rejected (sesuai enum kamu)
-      await updateBookingStatus(id, nextStatus);
+      await updateBookingStatus(id, nextStatus); // 1=Approved, 2=Rejected
       await fetchBookings();
     } catch (e: any) {
       console.error(e);
@@ -72,84 +151,176 @@ const RoomBookingsPage: React.FC = () => {
     }
   };
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p style={{ color: "crimson" }}>{error}</p>;
+  if (loading) {
+    return (
+      <Paper sx={{ p: 4 }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <CircularProgress size={22} />
+          <Typography>Loading bookings...</Typography>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  if (error) {
+    return (
+      <Paper sx={{ p: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Paper>
+    );
+  }
 
   return (
-    <div>
-      <h1>Daftar Peminjaman Ruangan</h1>
+    <Paper sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+      {/* Header */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+            Daftar Peminjaman Ruangan
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Pantau status booking dan lakukan persetujuan bila diperlukan.
+          </Typography>
+        </Box>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-        <Link to="/rooms">← Kembali ke Rooms</Link>
-        <Link to="/add-booking">
-          <button>Buat Booking</button>
-        </Link>
-      </div>
+        <Stack direction="row" spacing={1}>
+          <Button
+            component={RouterLink}
+            to="/rooms"
+            variant="outlined"
+            color="primary"
+          >
+            ← Rooms
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/add-booking"
+            variant="contained"
+            color="primary"
+          >
+            Buat Booking
+          </Button>
+        </Stack>
+      </Stack>
+
+      <Divider sx={{ mb: 2.5 }} />
 
       {bookings.length > 0 ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Nama Peminjam</th>
-              <th>Tujuan</th>
-              <th>Mulai</th>
-              <th>Selesai</th>
-              <th>Status</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
+        <TableContainer
+          sx={{
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}
+        >
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700 }}>Nama Peminjam</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tujuan</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: 190 }}>
+                  Mulai
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, width: 190 }}>
+                  Selesai
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, width: 260 }}>
+                  Status
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, width: 220 }}>
+                  Aksi
+                </TableCell>
+              </TableRow>
+            </TableHead>
 
-          <tbody>
-            {bookings.map((b) => {
-              const statusText = toStatusText(b.status);
-              const isPending = statusText === "pending" || statusText === "0"; // jaga-jaga kalau backend ngirim 0
-              const isUpdating = updatingId === b.id;
+            <TableBody>
+              {bookings.map((b) => {
+                const statusText = toStatusText(b.status);
+                const isPending =
+                  statusText === "pending" || statusText === "0";
+                const isUpdating = updatingId === b.id;
 
-              return (
-                <tr key={b.id}>
-                  <td>{b.bookerName}</td>
-                  <td>{b.purposeOfBooking}</td>
-                  <td>{formatDT(b.startTime)}</td>
-                  <td>{formatDT(b.endTime)}</td>
+                return (
+                  <TableRow key={b.id} hover sx={{ "& td": { py: 1.6 } }}>
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 700 }}>
+                        {b.bookerName}
+                      </Typography>
+                      
+                    </TableCell>
 
-                  <td>
-                    <span style={{ marginRight: 8 }}>{b.status}</span>
+                    <TableCell>{b.purposeOfBooking}</TableCell>
+                    <TableCell>{formatDT(b.startTime)}</TableCell>
+                    <TableCell>{formatDT(b.endTime)}</TableCell>
 
-                    {isPending && (
-                      <>
-                        <button
-                          onClick={() => handleChangeStatus(b.id, 1)}
-                          disabled={isUpdating}
-                          style={{ marginRight: 6 }}
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <StatusChip status={b.status} />
+
+                        {isPending && (
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              onClick={() => handleChangeStatus(b.id, 1)}
+                              disabled={isUpdating}
+                              variant="outlined"
+                              color="success"
+                              size="small"
+                            >
+                              {isUpdating ? "..." : "Approve"}
+                            </Button>
+
+                            <Button
+                              onClick={() => handleChangeStatus(b.id, 2)}
+                              disabled={isUpdating}
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                            >
+                              {isUpdating ? "..." : "Reject"}
+                            </Button>
+                          </Stack>
+                        )}
+                      </Stack>
+                    </TableCell>
+
+                    <TableCell>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          component={RouterLink}
+                          to={`/edit-booking/${b.id}`}
+                          variant="outlined"
+                          color="primary"
+                          size="small"
                         >
-                          {isUpdating ? "..." : "Approve"}
-                        </button>
-
-                        <button
-                          onClick={() => handleChangeStatus(b.id, 2)}
-                          disabled={isUpdating}
+                          Edit
+                        </Button>
+                        <Button
+                          onClick={() => handleDelete(b.id)}
+                          variant="outlined"
+                          color="error"
+                          size="small"
                         >
-                          {isUpdating ? "..." : "Reject"}
-                        </button>
-                      </>
-                    )}
-                  </td>
-
-                  <td style={{ display: "flex", gap: 8 }}>
-                    <Link to={`/edit-booking/${b.id}`}>
-                      <button>Edit</button>
-                    </Link>
-                    <button onClick={() => handleDelete(b.id)}>Hapus</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                          Hapus
+                        </Button>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       ) : (
-        <p>Belum ada booking.</p>
+        <Alert severity="info">Belum ada booking.</Alert>
       )}
-    </div>
+    </Paper>
   );
 };
 

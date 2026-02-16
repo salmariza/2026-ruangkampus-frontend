@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import api from "../services/api";
+
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Divider,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 type Room = {
   id: number;
@@ -27,7 +40,7 @@ const AddBookingPage: React.FC = () => {
     const fetchRooms = async () => {
       try {
         const res = await api.get("/Rooms");
-        // optional: cuma tampilkan room yang aktif
+        // optional: hanya room aktif
         const activeRooms = (res.data as Room[]).filter((r) => r.isActive);
         setRooms(activeRooms);
       } catch (e) {
@@ -48,116 +61,186 @@ const AddBookingPage: React.FC = () => {
     // validasi simpel
     if (!roomId) return setError("Pilih ruangan dulu.");
     if (!bookerName.trim()) return setError("Nama peminjam wajib diisi.");
-    if (!purposeOfBooking.trim()) return setError("Tujuan peminjaman wajib diisi.");
+    if (!purposeOfBooking.trim())
+      return setError("Tujuan peminjaman wajib diisi.");
     if (!startTime) return setError("Start time wajib diisi.");
     if (!endTime) return setError("End time wajib diisi.");
 
-    // optional: validasi start < end di FE
+    // validasi start < end
     const st = new Date(startTime).getTime();
     const et = new Date(endTime).getTime();
     if (!Number.isNaN(st) && !Number.isNaN(et) && st >= et) {
       return setError("StartTime harus lebih kecil dari EndTime.");
     }
 
+    // ambil roomName (backend minta RoomName required)
+    const selectedRoom = rooms.find((r) => r.id === Number(roomId));
+    if (!selectedRoom) return setError("Ruangan tidak ditemukan.");
+
     try {
       setSaving(true);
 
-      await api.post("/RoomBookings", {
-      roomId: Number(roomId),
-      bookerName: bookerName.trim(),
-      purposeOfBooking: purposeOfBooking.trim(),
-      startTime: new Date(startTime).toISOString(),
-      endTime: new Date(endTime).toISOString(),
-      status: "Pending",  
-    });
+      // IMPORTANT: ikut Swagger / backend validation => PascalCase
+      const payload = {
+        RoomId: Number(roomId),
+        RoomName: selectedRoom.name,
+        BookerName: bookerName.trim(),
+        PurposeOfBooking: purposeOfBooking.trim(),
+        StartTime: new Date(startTime).toISOString(),
+        EndTime: new Date(endTime).toISOString(),
+        Status: "Pending",
+      };
+
+      await api.post("/RoomBookings", payload);
 
       navigate("/room-bookings");
     } catch (e: any) {
       console.error(e);
-      // backend kamu suka balikin BadRequest kalau bentrok, jadi tampilkan pesannya kalau ada
-      const msg = e?.response?.data ?? "Gagal membuat booking.";
-      setError(typeof msg === "string" ? msg : "Gagal membuat booking.");
+
+      // tampilkan error backend dengan rapi
+      const data = e?.response?.data;
+      let msg = "Gagal membuat booking.";
+
+      if (typeof data === "string") {
+        msg = data;
+      } else if (data?.errors) {
+        // ASP.NET validation format: { errors: { Field: ["msg"] } }
+        const firstField = Object.keys(data.errors)[0];
+        const firstMsg = data.errors?.[firstField]?.[0];
+        msg = firstMsg || data.title || msg;
+      } else if (data?.title || data?.message) {
+        msg = data.title || data.message;
+      }
+
+      setError(msg);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div>
-      <h1>Buat Booking Ruangan</h1>
+    <Paper sx={{ p: { xs: 2.5, sm: 3.5 }, maxWidth: 760, mx: "auto" }}>
+      {/* Header */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+            Buat Booking Ruangan
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Ajukan peminjaman ruangan sesuai kebutuhan Anda.
+          </Typography>
+        </Box>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-        <Link to="/room-bookings">← Kembali</Link>
-      </div>
+        <Button
+          component={RouterLink}
+          to="/room-bookings"
+          variant="outlined"
+          color="primary"
+        >
+          ← Kembali
+        </Button>
+      </Stack>
+
+      <Divider sx={{ mb: 2.5 }} />
 
       {loadingRooms ? (
-        <p>Loading rooms...</p>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <CircularProgress size={22} />
+          <Typography>Loading rooms...</Typography>
+        </Stack>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10, maxWidth: 480 }}>
-          <label>
-            Pilih Ruangan
-            <select
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={2.2}>
+            <TextField
+              select
+              label="Pilih Ruangan"
               value={roomId}
-              onChange={(e) => setRoomId(e.target.value ? Number(e.target.value) : "")}
-              style={{ width: "100%", padding: 8 }}
+              onChange={(e) =>
+                setRoomId(e.target.value ? Number(e.target.value) : "")
+              }
+              fullWidth
+              required
             >
-              <option value="">-- pilih ruangan --</option>
+              <MenuItem value="">-- pilih ruangan --</MenuItem>
               {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
+                <MenuItem key={r.id} value={r.id}>
                   {r.name}
-                </option>
+                </MenuItem>
               ))}
-            </select>
-          </label>
+            </TextField>
 
-          <label>
-            Nama Peminjam
-            <input
+            <TextField
+              label="Nama Peminjam"
               value={bookerName}
               onChange={(e) => setBookerName(e.target.value)}
               placeholder="Contoh: Salma"
-              style={{ width: "100%", padding: 8 }}
+              fullWidth
+              required
             />
-          </label>
 
-          <label>
-            Tujuan Peminjaman
-            <input
+            <TextField
+              label="Tujuan Peminjaman"
               value={purposeOfBooking}
               onChange={(e) => setPurposeOfBooking(e.target.value)}
               placeholder="Contoh: Rapat UKM"
-              style={{ width: "100%", padding: 8 }}
+              fullWidth
+              required
             />
-          </label>
 
-          <label>
-            Waktu Mulai
-            <input
-              type="datetime-local"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              style={{ width: "100%", padding: 8 }}
-            />
-          </label>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                label="Waktu Mulai"
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                required
+              />
 
-          <label>
-            Waktu Selesai
-            <input
-              type="datetime-local"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              style={{ width: "100%", padding: 8 }}
-            />
-          </label>
+              <TextField
+                label="Waktu Selesai"
+                type="datetime-local"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Stack>
 
-          {error && <p style={{ color: "crimson" }}>{error}</p>}
+            {error && <Alert severity="error">{error}</Alert>}
 
-          <button type="submit" disabled={saving} style={{ padding: "10px 12px" }}>
-            {saving ? "Menyimpan..." : "Buat Booking"}
-          </button>
-        </form>
+            <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+              <Button
+                component={RouterLink}
+                to="/room-bookings"
+                variant="outlined"
+                color="primary"
+                disabled={saving}
+              >
+                Batal
+              </Button>
+
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={saving}
+              >
+                {saving ? "Menyimpan..." : "Buat Booking"}
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
       )}
-    </div>
+    </Paper>
   );
 };
 
